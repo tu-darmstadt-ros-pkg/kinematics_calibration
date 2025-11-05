@@ -147,8 +147,8 @@
     </visual>
   </link>
   <joint name="ball_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.04"/>
-    <!--origin rpy="0 0 0" xyz="0 0 0.1034"/-->
+    <!-- Kuka iiwa 14 -->
+    <origin rpy="0 0 0" xyz="-6.883092077759519e-05 -0.00018701061367410447 0.04081277546913972"/>
     <parent link="tool0"/>
     <child link="ball_link"/>
   </joint>

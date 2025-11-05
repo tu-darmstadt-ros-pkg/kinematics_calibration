@@ -390,10 +390,10 @@
     </visual>
   </link>
   <joint name="ball_joint" type="fixed">
-    <origin rpy="0.0 0.0 0.0" xyz="0.00038860649894460975 -0.0005822849938650045 0.180196205872143" />
+    <!-- Kinova Gen3 Lite -->
+    <origin rpy="0.0 0.0 0.0" xyz="0.0012427126494462678 -0.0014339702286163775 0.18526544228489414" />
 
     <parent link="gripper_base_link"/>
     <child link="ball_link"/>
   </joint>
 </robot>
-

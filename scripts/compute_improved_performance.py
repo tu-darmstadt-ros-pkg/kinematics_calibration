@@ -1,7 +1,7 @@
 import argparse
 import os
 import yaml
-from calibrate_fk.utils import compute_improved_performance
+from calibrate_fk.utils import compute_improved_performance, print_parameter_changes
 import sys
 
 def main():
@@ -43,6 +43,7 @@ def main():
 
     compute_improved_performance(model_folder, training_data, evaluation_data, offset_distance, latex)
 
+    print_parameter_changes(model_folder)
 if __name__ == "__main__":
     main()
 

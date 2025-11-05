@@ -29,7 +29,7 @@ def main():
     # run the script run_optimizer.py with the arguments model and data
     data_args = ' '.join(data)
     os.system(f"python3 run_optimizer.py --model {model} --data {data_args}")
-    os.system(f"python3 generate_learning_curve.py --model {robot_name} --repeatability {repeatability} ")
+    os.system(f"python3 generate_learning_curve.py --model {robot_name} --repeatability {repeatability} --latex ")
     os.system(f"python3 generate_overlay.py --model {robot_name} --data {data_args} ")
     os.system(f"python3 compute_improved_performance.py --model {robot_name} ")
 

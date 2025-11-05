@@ -376,7 +376,7 @@ class ParameterOptimizer():
             for i, intermediate_solution in enumerate(calibration_iteration_callback.solutions):
                 self.save_intermediate_solution(intermediate_solution, parameter_list, i)
 
-    def _run_optimization(self, use_dynamic_means: bool = True, use_distortion_error: bool = False, use_regularization: bool = False, saving_steps: bool = False):
+    def _run_optimization(self, use_dynamic_means: bool = True, use_distortion_error: bool = True, use_regularization: bool = True, saving_steps: bool = False):
         """Common optimization routine."""
         self.create_fk_expression()
         self._fk_fun_pure = ca.Function("fk_pure", [self._q], [self._fk_casadi_expr_pure])

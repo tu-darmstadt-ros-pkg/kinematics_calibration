@@ -37,11 +37,22 @@ def read_each(folder: Optional[str] = None) -> Tuple[np.ndarray, np.ndarray]:
         raise FileNotFoundError(f"Data file {file_path_2} not found.")
     
     try:
-        data_1 = np.loadtxt(file_path_1, delimiter=",")
+        # Try loading with skiprows=1 first (in case there's a header)
+        try:
+            data_1 = np.loadtxt(file_path_1, delimiter=",", skiprows=1)
+        except (ValueError, IndexError):
+            # If that fails, try without skipping rows
+            data_1 = np.loadtxt(file_path_1, delimiter=",")
     except Exception as e:
         raise ValueError(f"Failed to load data from {file_path_1}. Error: {e}")
+    
     try:
-        data_2 = np.loadtxt(file_path_2, delimiter=",")
+        # Try loading with skiprows=1 first (in case there's a header)
+        try:
+            data_2 = np.loadtxt(file_path_2, delimiter=",", skiprows=1)
+        except (ValueError, IndexError):
+            # If that fails, try without skipping rows
+            data_2 = np.loadtxt(file_path_2, delimiter=",")
     except Exception as e:
         raise ValueError(f"Failed to load data from {file_path_2}. Error: {e}")
     # check if the array is loaded correctly and it is not empty 
@@ -266,18 +277,118 @@ def remove_outliers(model, data, verbose=False):
         #update the data
         # data[tool_position] = [data_hole_0[mask_1], data_hole_1[mask_2]]
     return data
+def print_parameter_changes(model_folder: str, threshold: float = 1e-6) -> None:
+    """
+    Print a table showing how each optimized parameter changed between initial and final model.
+    Only displays parameters with significant changes above the threshold.
+    
+    Args:
+        model_folder: Path to the calibrated model folder containing step_0 and final step
+        threshold: Minimum absolute change to consider significant (default: 1e-6)
+    """
+    import xml.etree.ElementTree as ET
+    
+    kpis = yaml.load(open(f"{model_folder}/kpis.yaml"), Loader=yaml.FullLoader)
+    nb_steps = kpis["nb_steps"]
+    
+    # Load initial and final URDF files
+    initial_urdf = f"{model_folder}/step_0/model.urdf"
+    final_urdf = f"{model_folder}/step_{nb_steps}/model.urdf"
+    
+    tree_initial = ET.parse(initial_urdf)
+    tree_final = ET.parse(final_urdf)
+    
+    root_initial = tree_initial.getroot()
+    root_final = tree_final.getroot()
+    
+    # Extract joint parameters
+    joints_initial = {}
+    joints_final = {}
+    
+    for joint in root_initial.findall('.//joint'):
+        joint_name = joint.get('name')
+        origin = joint.find('origin')
+        if origin is not None:
+            xyz = origin.get('xyz', '0 0 0')
+            rpy = origin.get('rpy', '0 0 0')
+            joints_initial[joint_name] = {
+                'xyz': [float(x) for x in xyz.split()],
+                'rpy': [float(x) for x in rpy.split()]
+            }
+    
+    for joint in root_final.findall('.//joint'):
+        joint_name = joint.get('name')
+        origin = joint.find('origin')
+        if origin is not None:
+            xyz = origin.get('xyz', '0 0 0')
+            rpy = origin.get('rpy', '0 0 0')
+            joints_final[joint_name] = {
+                'xyz': [float(x) for x in xyz.split()],
+                'rpy': [float(x) for x in rpy.split()]
+            }
+    
+    # Collect significant changes
+    significant_changes = []
+    
+    for joint_name in sorted(joints_initial.keys()):
+        if joint_name in joints_final:
+            # XYZ parameters
+            for i, coord in enumerate(['x', 'y', 'z']):
+                param_name = f"{joint_name}_xyz_{coord}"
+                initial_val = joints_initial[joint_name]['xyz'][i]
+                final_val = joints_final[joint_name]['xyz'][i]
+                change = final_val - initial_val
+                abs_change = abs(change)
+                
+                if abs_change > threshold:
+                    significant_changes.append((param_name, initial_val, final_val, change, abs_change))
+            
+            # RPY parameters
+            for i, angle in enumerate(['roll', 'pitch', 'yaw']):
+                param_name = f"{joint_name}_rpy_{angle}"
+                initial_val = joints_initial[joint_name]['rpy'][i]
+                final_val = joints_final[joint_name]['rpy'][i]
+                change = final_val - initial_val
+                abs_change = abs(change)
+                
+                if abs_change > threshold:
+                    significant_changes.append((param_name, initial_val, final_val, change, abs_change))
+    
+    # Print table only if there are significant changes
+    if significant_changes:
+        print("\n" + "="*120)
+        print(f"SIGNIFICANT PARAMETER CHANGES (threshold: {threshold:.1e})")
+        print("="*120)
+        print(f"{'Parameter':<30} {'Initial Value':<25} {'Final Value':<25} {'Change':<20} {'|Change|':<15}")
+        print("-"*120)
+        
+        for param_name, initial_val, final_val, change, abs_change in significant_changes:
+            print(f"{param_name:<30} {initial_val:<25.6e} {final_val:<25.6e} {change:<20.6e} {abs_change:<15.6e}")
+        
+        print("="*120)
+        print(f"Total optimization steps: {nb_steps}")
+        print(f"Parameters with significant changes: {len(significant_changes)}")
+        print("="*120 + "\n")
+    else:
+        print(f"\nNo significant parameter changes found (threshold: {threshold:.1e})")
+        print(f"Total optimization steps: {nb_steps}\n")
+
 def compute_improved_performance(model_folder: str, data_folders_train: List[str], data_folders_test: List[str], offset_distance, latex=False) -> None:
 
     kpis = yaml.load(open(f"{model_folder}/kpis.yaml"), Loader=yaml.FullLoader)
     nb_steps = kpis["nb_steps"]
 
-    steps = list(range(nb_steps))
     steps = [0, nb_steps ]
     distances_train = [[] for _ in data_folders_train]
     distances_test = [[] for _ in data_folders_test]
 
     variances_train =  [[] for _ in data_folders_train]
     variances_test = [[] for _ in data_folders_test]
+
+    socket_1_train = []
+    socket_2_train = []
+    socket_1_test = []
+    socket_2_test = []
 
     mae_train = [[] for _ in data_folders_train]
     mae_test = [[] for _ in data_folders_test]
@@ -306,6 +417,16 @@ def compute_improved_performance(model_folder: str, data_folders_train: List[str
             variances_test[i].append(std_dev)
             mae_test[i].append(mae)
         key_test = list(value.keys())
+    
+    for i, (key, value) in enumerate(statistics_train.items()):
+
+        socket_1_train.append(value["mean_1"])
+        socket_2_train.append(value["mean_2"])
+
+    for i, (key, value) in enumerate(statistics_test.items()):
+        socket_1_test.append(value["mean_1"])
+        socket_2_test.append(value["mean_2"])
+
     percentage_improved_distance_train =  [(distances_train[i][0] - distances_train[i][-1])/distances_train[i][0] * 100 for i in range(len(data_folders_train))]
     percentage_improved_variance_train =  [(variances_train[i][0] - variances_train[i][-1])/variances_train[i][0] * 100 for i in range(len(data_folders_train))]
     percentage_improved_mae_train =  [(mae_train[i][0] - mae_train[i][-1])/mae_train[i][0] * 100 for i in range(len(data_folders_train))]
@@ -315,6 +436,12 @@ def compute_improved_performance(model_folder: str, data_folders_train: List[str
     print(f"Percentage of removed error on train set: {np.mean(percentage_improved_mae_train):.2f}")
     # print(f"Percentage of removed error on train set: {np.mean(percentage_improved_variance_train)}")
     # print(f"Percentage of removed distortion error on train set {np.mean(percentage_improved_distance_train)}")
+
+    print("Estimated sockets position in training set:")
+    print("Socket 1\t\t\tSocket 2")
+    for socket1, socket2 in zip(socket_1_train, socket_2_train):
+
+        print(f" & {socket1[0]:.3f} {socket1[1]:.3f} {socket1[2]:.3f} & {socket2[0]:.3f} {socket2[1]:.3f} {socket2[2]:.3f} \ \ Distance: {np.linalg.norm(np.array(socket1) - np.array(socket2)):.3f} ")
 
 
     if distances_test: # if there is test data
@@ -330,6 +457,12 @@ def compute_improved_performance(model_folder: str, data_folders_train: List[str
         print(f"Percentage of removed error on test set: {np.mean(percentage_improved_mae_test):.2f}")
         # print(f"Percentage of removed error on test set: {np.mean(percentage_improved_variance_test)}")
         # print(f"Percentage of removed distortion error on test set {np.mean(percentage_improved_distance_test)}")
+
+        print("Estimated Socket positions in test set:")
+        print("Socket 1\t\t\tSocket 2")
+        for socket1, socket2 in zip(socket_1_test, socket_2_test):
+
+            print(f" & {socket1[0]:.3f} {socket1[1]:.3f} {socket1[2]:.3f} & {socket2[0]:.3f} {socket2[1]:.3f} {socket2[2]:.3f} \ \ Distance: {np.linalg.norm(np.array(socket1) - np.array(socket2)):.3f} ")
     else:
         print("No test data provided")
 def plot_training_curves(model_folder: str, data_folders_train: str, data_folders_test: List[str], offset_distance, repeatability : float, latex=False) -> None:
@@ -367,7 +500,6 @@ def plot_training_curves(model_folder: str, data_folders_train: str, data_folder
             distances_test[i].append(distance_error)
             variances_test[i].append(std_dev)
         key_test = list(statistics.keys())
-    # breakpoint()
     fontsize=20
     # CONSISTENCY
     fig, ax = plt.subplots(1, 1)
@@ -392,21 +524,22 @@ def plot_training_curves(model_folder: str, data_folders_train: str, data_folder
     ax.tick_params(axis='both', which='major', labelsize=fontsize)
     ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     ax.xaxis.set_major_locator(plt.MultipleLocator(1))
+    ax.set_xlim(left=0)
     ax.set_ylim(1e-4/2, 3e-2)
 
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
 
     plt.tight_layout()
-    if latex:
-        plt.savefig(f"{model_folder}/consistency.pgf")
-    else:
-        plt.savefig(f"{model_folder}/consistency.png")
+    # if latex:
+    #     plt.savefig(f"{model_folder}/consistency.pgf")
+    # else:
+    plt.savefig(f"{model_folder}/consistency.png")
 
 
 
     # DISTORTION
-        fig, ax = plt.subplots(1, 1)
+    fig, ax = plt.subplots(1, 1)
     # make log scale
     ax.set_yscale("log")
     for i, distances in enumerate(distances_train):
@@ -431,6 +564,7 @@ def plot_training_curves(model_folder: str, data_folders_train: str, data_folder
     ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
     # only show the step at every 5th
     ax.xaxis.set_major_locator(plt.MultipleLocator(1))
+    ax.set_xlim(left=0)
 
     ax.set_ylim(1e-7, 1e-2)
     # ax.set_ylim(1e-4/2, 3e-2)
@@ -445,10 +579,10 @@ def plot_training_curves(model_folder: str, data_folders_train: str, data_folder
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     plt.tight_layout()
-    if latex:
-        plt.savefig(f"{model_folder}/distortion.pgf")
-    else:
-        plt.savefig(f"{model_folder}/distortion.png")
+    # if latex:
+    #     plt.savefig(f"{model_folder}/distortion.pgf")
+    # else:
+    plt.savefig(f"{model_folder}/distortion.png")
 
 
     plt.show()

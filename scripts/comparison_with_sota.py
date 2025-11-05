@@ -19,7 +19,7 @@ def plot_ablation_box_plots(results_dict: dict, initial_stats: dict, offset_dist
     """
     # Set seaborn style
     sns.set_style("whitegrid")
-    sns.set_context("paper", font_scale=1.2)
+    sns.set_context("paper", font_scale=2.0)
     
     if latex:
         plt.rcParams.update({
@@ -42,10 +42,10 @@ def plot_ablation_box_plots(results_dict: dict, initial_stats: dict, offset_dist
     
     # Create dataframes for seaborn
     for value in initial_consistency:
-        consistency_data.append({'Scenario': 'Before\nTraining', 'Consistency [m]': value})
+        consistency_data.append({'Scenario': 'Nominal\nModel', 'Consistency [m]': value})
     for value in initial_distortion:
-        distortion_data.append({'Scenario': 'Before\nTraining', 'Distortion [m]': value})
-    
+        distortion_data.append({'Scenario': 'Nominal\nModel', 'Distortion [m]': value})
+
     # Add optimized scenarios
     for scenario_name, stats in results_dict.items():
         consistency_values = [stat["std_dev_fk"] for stat in stats.values()]
@@ -60,16 +60,16 @@ def plot_ablation_box_plots(results_dict: dict, initial_stats: dict, offset_dist
     df_consistency = pd.DataFrame(consistency_data)
     df_distortion = pd.DataFrame(distortion_data)
     
-    # Create figure with subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    # Create figure with subplots - stacked vertically
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 16), sharex=True)
     
     # Define a beautiful color palette
-    colors = ['#2E2E2E', '#3498DB', '#2ECC71', '#E74C3C', '#F39C12']  # Dark gray for initial, then vibrant colors
+    colors = ['#7F7F7F', '#3498DB', '#2ECC71', '#E74C3C', '#F39C12']  # Medium gray for initial, then vibrant colors
     palette = sns.color_palette(colors[:len(df_consistency['Scenario'].unique())])
-
+    
     # Consistency box plot with seaborn
-    sns.boxplot(data=df_consistency, x='Scenario', y='Consistency [m]', 
-                palette=palette, ax=ax1, linewidth=2)
+    sns.barplot(data=df_consistency, x='Scenario', y='Consistency [m]', 
+                palette=palette, ax=ax1, linewidth=2, estimator=np.median, errorbar='sd')
 
     # Add individual points to show data distribution
     sns.stripplot(data=df_consistency, x='Scenario', y='Consistency [m]', 
@@ -77,19 +77,24 @@ def plot_ablation_box_plots(results_dict: dict, initial_stats: dict, offset_dist
 
     # Customize consistency plot
     ax1.set_yscale('log')
-    ax1.set_ylabel('Consistency σ [m]', fontsize=16, fontweight='bold')
-    # ax1.set_xlabel('Optimization Scenario', fontsize=16, fontweight='bold')
-    ax1.set_title('Consistency Comparison - Ablation Study', fontsize=18, fontweight='bold', pad=20)
-    ax1.tick_params(axis='both', which='major', labelsize=12)
-    ax1.tick_params(axis='x', rotation=90, labelsize=20)
+    ax1.set_ylabel('Inconsistency $\\sigma$ [m]', fontsize=28, fontweight='bold')
+    ax1.set_xlabel('')  # Remove any x-axis label
+    # ax1.set_title('Consistency Comparison - Ablation Study', fontsize=18, fontweight='bold', pad=20)
+    ax1.tick_params(axis='both', which='major', labelsize=20, labelcolor='black')
+    ax1.tick_params(axis='x', labelsize=24, labelcolor='black', labelbottom=False)  # Hide x labels on top plot
+    ax1.tick_params(axis='y', labelsize=24, labelcolor='black')  # Make y-axis tick labels bigger
+    
+    # Make tick labels bold
+    for label in ax1.get_yticklabels():
+        label.set_fontweight('bold')
     
     # Add grid for better readability
     ax1.grid(True, alpha=0.3, linestyle='--')
     ax1.set_axisbelow(True)
 
     # Distortion box plot with seaborn
-    sns.boxplot(data=df_distortion, x='Scenario', y='Distortion [m]', 
-                palette=palette, ax=ax2, linewidth=2)
+    sns.barplot(data=df_distortion, x='Scenario', y='Distortion [m]', 
+                palette=palette, ax=ax2, linewidth=2, estimator=np.median, errorbar='sd')
 
     # Add individual points to show data distribution
     sns.stripplot(data=df_distortion, x='Scenario', y='Distortion [m]', 
@@ -97,11 +102,18 @@ def plot_ablation_box_plots(results_dict: dict, initial_stats: dict, offset_dist
     
     # Customize distortion plot
     ax2.set_yscale('log')
-    ax2.set_ylabel('Distortion ε [m]', fontsize=16, fontweight='bold')
-    # ax2.set_xlabel('Optimization Scenario', fontsize=16, fontweight='bold')
-    ax2.set_title('Distortion Comparison - Ablation Study', fontsize=18, fontweight='bold', pad=20)
-    ax2.tick_params(axis='both', which='major', labelsize=12)
-    ax2.tick_params(axis='x', rotation=90, labelsize=20)
+    ax2.set_ylabel('Distortion $\\epsilon$ [m]', fontsize=28, fontweight='bold')
+    ax2.set_xlabel('')  # Remove the "Scenario" x-axis label
+    # ax2.set_title('Distortion Comparison - Ablation Study', fontsize=18, fontweight='bold', pad=20)
+    ax2.tick_params(axis='both', which='major', labelsize=20, labelcolor='black')
+    ax2.tick_params(axis='x', labelsize=24, labelcolor='black')
+    ax2.tick_params(axis='y', labelsize=24, labelcolor='black')  # Make y-axis tick labels bigger
+    
+    # Make tick labels bold
+    for label in ax2.get_xticklabels():
+        label.set_fontweight('bold')
+    for label in ax2.get_yticklabels():
+        label.set_fontweight('bold')
     
     # Add grid for better readability
     ax2.grid(True, alpha=0.3, linestyle='--')
@@ -235,8 +247,8 @@ def main():
 
     script_directory = os.path.abspath(__file__)
     parent_directory = os.path.join(os.path.dirname(script_directory), os.path.pardir)
-    
-    output_path = os.path.abspath(os.path.join(parent_directory, 'calibrated_urdf', robot_name + '_comparison'))
+
+    output_path = os.path.abspath(os.path.join(parent_directory, 'comparisons', robot_name))
     urdf_path = os.path.abspath(os.path.join(parent_directory, 'urdf', model + ".urdf"))
 
     # Check if paths exist
@@ -327,11 +339,11 @@ def main():
             'params': {'use_dynamic_means': True, 'use_distortion_error': False, 'use_regularization': False}
         },
         {
-            'name': 'Variance +\nDistortion',
+            'name': 'Variance\nDistort.\n(ours)',
             'params': {'use_dynamic_means': True, 'use_distortion_error': True, 'use_regularization': False}
         },
         {
-            'name': 'Variance +\nDistortion +\nReg.',
+            'name': 'Variance\nDistort.\nReg.\n(ours)',
             'params': {'use_dynamic_means': True, 'use_distortion_error': True, 'use_regularization': True}
         }
     ]
@@ -377,12 +389,12 @@ def main():
     
     # Save plots
     if latex:
-        fig.savefig(f"{output_path}/ablation_study_violinplots.pgf", bbox_inches='tight', dpi=300)
-        fig.savefig(f"{output_path}/ablation_study_violinplots.pdf", bbox_inches='tight', dpi=300)
+        fig.savefig(f"{output_path}/ablation_study_boxplot.pgf", bbox_inches='tight', dpi=300)
+        fig.savefig(f"{output_path}/ablation_study_boxplot.pdf", bbox_inches='tight', dpi=300)
     else:
-        fig.savefig(f"{output_path}/ablation_study_violinplots.png", dpi=300, bbox_inches='tight', 
+        fig.savefig(f"{output_path}/ablation_study_boxplot.png", dpi=300, bbox_inches='tight', 
                    facecolor='white', edgecolor='none')
-        fig.savefig(f"{output_path}/ablation_study_violinplots.pdf", bbox_inches='tight', dpi=300,
+        fig.savefig(f"{output_path}/ablation_study_boxplot.pdf", bbox_inches='tight', dpi=300,
                    facecolor='white', edgecolor='none')
     
     plt.show()
