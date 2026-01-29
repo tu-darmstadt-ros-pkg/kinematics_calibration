@@ -62,6 +62,21 @@ def read_each(folder: Optional[str] = None) -> Tuple[np.ndarray, np.ndarray]:
         raise ValueError(f"Data files {file_path_1} and {file_path_2} have different number of columns.")
     return data_1, data_2
 
+def read_joint_names(folder: Optional[str] = None) -> List[str]:
+
+    recording_folder = folder
+    if not recording_folder or not os.path.exists(recording_folder):
+        raise FileNotFoundError(f"Recording folder {recording_folder} not found.")
+    file_path = os.path.join(recording_folder, "hole_0.csv")
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Joint names file {file_path} not found.")
+
+    joint_names = []
+    with open(file_path, 'r') as f:
+        first_line = f.readline().strip()
+        joint_names = re.split(r',\s*', first_line)
+    return joint_names
+
 def replace_mesh_with_cylinder(urdf_file, out_file: str) -> str:
     # Parse the URDF file
     tree = ET.parse(urdf_file)
